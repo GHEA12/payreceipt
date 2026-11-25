@@ -1,0 +1,10 @@
+{
+  "name": "payreceipt",
+  "private": true,
+  "version": "1.0.0",
+  "license": "MIT",
+  "description": "PayReceipt: agent-verified invoice payments with hash-chained receipts on Aevum Testnet (QDay).",
+  "dependencies": {
+    "ethers": "^6.13.4"
+  }
+}
