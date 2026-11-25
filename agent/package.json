@@ -1,0 +1,1 @@
+{"description":"PayReceipt checking agent for Aevum Testnet: five verification checks gate an escrow release; every outcome is written to a hash-chained receipt log.","license":"MIT","name":"payreceipt-agent","private":true,"scripts":{"demo":"node demo.js","test":"node --test test/*.test.js"},"version":"1.0.0"}
