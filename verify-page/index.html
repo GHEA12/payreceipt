@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PayReceipt — Verify a receipt log</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 760px; padding: 0 1rem; line-height: 1.5; }
+  textarea { width: 100%; height: 220px; font-family: ui-monospace, monospace; font-size: 12px; }
+  button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
+  .ok { color: #137333; font-weight: 600; }
+  .bad { color: #b3261e; font-weight: 600; }
+  li { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+</style>
+</head>
+<body>
+<h1>PayReceipt — receipt log verifier</h1>
+<p>Paste a PayReceipt receipt log (a JSON array of receipt records, as written by
+the agent) below. This page recomputes the SHA-256 hash chain entirely in your
+browser — the same canonical form the agent uses — and reports whether every
+record is untouched and in order. Nothing is uploaded anywhere.</p>
+<textarea id="input" placeholder='[{"seq":1,"prevHash":"GENESIS",...}]'></textarea>
+<p><button id="go">Verify</button></p>
+<div id="out"></div>
+<script>
+"use strict";
+// Canonical JSON, identical to agent/checks.js: keys sorted at every depth.
+function canonical(v) {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return "[" + v.map(canonical).join(",") + "]";
+  return "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}";
+}
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+document.getElementById("go").addEventListener("click", async () => {
+  const out = document.getElementById("out");
+  let log;
+  try { log = JSON.parse(document.getElementById("input").value); }
+  catch (e) { out.innerHTML = '<p class="bad">Not valid JSON: ' + e.message + "</p>"; return; }
+  if (!Array.isArray(log)) { out.innerHTML = '<p class="bad">Expected a JSON array of receipt records.</p>'; return; }
+  const rows = [];
+  let prev = "GENESIS", bad = 0;
+  for (let i = 0; i < log.length; i++) {
+    const r = log[i];
+    const { hash, ...unsigned } = r;
+    const recomputed = await sha256Hex(canonical(unsigned));
+    const problems = [];
+    if (r.seq !== i + 1) problems.push("seq out of order");
+    if (r.prevHash !== prev) problems.push("prevHash does not match the previous record");
+    if (recomputed !== hash) problems.push("hash mismatch — record was edited");
+    if (problems.length) bad++;
+    rows.push(`<li class="${problems.length ? "bad" : "ok"}">#${r.seq} ${r.outcome} invoice ${r.invoiceId} amount ${r.amount} — ${problems.length ? problems.join("; ") : "OK"}</li>`);
+    prev = r.hash;
+  }
+  out.innerHTML = `<p class="${bad ? "bad" : "ok"}">${bad ? "TAMPERED: " + bad + " record(s) failed verification" : "VERIFIED: all " + log.length + " record(s) intact, chain unbroken"}</p><ul>${rows.join("")}</ul>`;
+});
+</script>
+</body>
+</html>
